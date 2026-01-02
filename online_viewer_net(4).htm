@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kindle Home</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --border-color: #000000;
+            --accent-bg: #e0e0e0;
+            --graph-line: #000000;
+        }
+
+        body.dark-mode {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --border-color: #ffffff;
+            --accent-bg: #333333;
+            --graph-line: #ffffff;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            box-sizing: border-box;
+            transition: background 0.3s, color 0.3s, transform 0.5s;
+        }
+
+        body.rot-90 { transform: rotate(90deg); transform-origin: center; width: 100vh; height: 100vw; position: absolute; top: 50%; left: 50%; margin-top: -50vw; margin-left: -50vh; }
+        body.rot-180 { transform: rotate(180deg); }
+        body.rot-270 { transform: rotate(270deg); transform-origin: center; width: 100vh; height: 100vw; position: absolute; top: 50%; left: 50%; margin-top: -50vw; margin-left: -50vh; }
+
+        .hidden { display: none !important; }
+        .icon { width: 50px; height: 50px; display: block; margin: 0 auto; object-fit: contain; }
+        svg.icon { stroke: currentColor; fill: none; }
+        body.dark-mode img.icon { filter: invert(1); } 
+
+        .nav-btn { position: absolute; top: 10px; background: var(--text-color); color: var(--bg-color); border: 1px solid var(--border-color); padding: 8px 12px; font-size: 14px; cursor: pointer; z-index: 100; font-weight: bold; }
+        #mode-btn { left: 10px; }
+        #settings-btn { right: 10px; }
+
+        #settings-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 200; display: flex; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-color); color: var(--text-color); border: 4px solid var(--border-color); padding: 20px; width: 85%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+        .modal-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; border-bottom: 2px solid var(--border-color); }
+        .setting-group { margin-bottom: 15px; }
+        .setting-label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 1rem; }
+        select, button.action-btn { width: 100%; padding: 10px; font-size: 1rem; background: var(--bg-color); color: var(--text-color); border: 2px solid var(--border-color); margin-bottom: 5px; }
+        .close-btn { background: var(--text-color); color: var(--bg-color); font-weight: bold; margin-top: 10px;}
+
+        #clock-view { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        #time-display { font-size: 10rem; font-weight: bold; line-height: 1; letter-spacing: -5px; }
+        #date-display { font-size: 2rem; margin-top: 10px; opacity: 0.8; }
+
+        #weather-view { display: flex; flex-direction: column; height: 100%; padding-top: 40px; width: 100%; }
+        #weather-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        #location-input-container { margin-bottom: 20px; text-align: center; flex-shrink: 0;}
+        #city-input { font-size: 1.2rem; padding: 5px; background: var(--bg-color); color: var(--text-color); border: 2px solid var(--border-color); width: 200px; }
+
+        .layout-standard .forecast-row { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 20px; flex-shrink: 0; }
+        .layout-standard .bottom-section { display: flex; flex: 1; gap: 20px; align-items: flex-start; min-height: 0; }
+        .layout-standard .current-box { border: 2px solid var(--border-color); padding: 15px; width: 20%; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 160px; flex-shrink: 0; }
+        .layout-standard .graph-container { flex: 1; height: 100%; max-height: 200px; width: 100%; position: relative; display: flex; align-items: flex-end; }
+
+        .day-card { text-align: center; flex: 1; }
+        .day-name { font-size: 1.2rem; margin-bottom: 5px; font-weight: bold; }
+        .day-temp { font-size: 1.5rem; margin-top: 5px; }
+        .current-city { font-size: 1.2rem; margin-top: 10px; line-height: 1.2;}
+        .current-temp { font-size: 2.5rem; font-weight: bold; margin-top: 5px; }
+
+        svg#temp-graph { width: 100%; height: 100%; display: block; }
+        .graph-label { font-size: 12px; text-anchor: middle; fill: var(--text-color); }
+        .graph-point { fill: var(--text-color); }
+        .graph-line { fill: none; stroke: var(--graph-line); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    </style>
+</head>
+<body class="layout-standard">
+
+    <button id="mode-btn" class="nav-btn" onclick="toggleMode()">Weather</button>
+    <button id="settings-btn" class="nav-btn" onclick="openSettings()">⚙</button>
+
+    <div id="clock-view">
+        <div id="time-display">Error</div>
+        <div id="date-display">If you are seeing this it probably means that your Kindle device could not connect to the internet/could not retrive the time info.  Try reffering to the ReadMe in the GitHub page for more info.</div>
+    </div>
+
+    <div id="weather-view" class="hidden">
+        <div id="location-input-container">
+            <input type="text" id="city-input" placeholder="Enter city" onkeydown="if(event.key === 'Enter') fetchWeather(this.value)">
+        </div>
+        <div id="weather-content">
+            <div class="forecast-row" id="forecast-container"></div>
+            <div class="bottom-section">
+                <div class="current-box" id="current-box"></div>
+                <div class="graph-container" id="graph-wrapper">
+                    <svg id="temp-graph"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="hidden">
+        <div class="modal-content">
+            <div class="modal-title">Settings</div>
+            
+            <div class="setting-group">
+                <label class="setting-label">Time</label>
+                <select id="set-time-format">
+                    <option value="24">24 Hour</option>
+                    <option value="12">12 Hour</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Screen Rotation</label>
+                <select id="set-rotation">
+                    <option value="0">0°</option>
+                    <option value="90">90°</option>
+                    <option value="180">180°</option>
+                    <option value="270">270°</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Temperature Units</label>
+                <select id="set-unit">
+                    <option value="C">Celsius</option>
+                    <option value="F">Fahrenheit</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Theme</label>
+                <select id="set-theme">
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
+                    <option value="auto">Time based (6AM to 8PM)</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Layout</label>
+                <select id="set-layout">
+                    <option value="layout-standard">Standard</option>
+                    <option value="layout-minimal">No Graph</option>
+                </select>
+            </div>
+
+            <button class="action-btn close-btn" onclick="saveAndCloseSettings()">Save</button>
+        </div>
+    </div>
+
+<script>
+    let appState = {
+        city: localStorage.getItem('kindleCity') || '',
+        unit: localStorage.getItem('kindleUnit') || 'C',
+        theme: localStorage.getItem('kindleTheme') || 'light',
+        layout: localStorage.getItem('kindleLayout') || 'layout-standard',
+        timeFormat: localStorage.getItem('kindleTimeFormat') || '24',
+        rotation: localStorage.getItem('kindleRotation') || '0',
+        weatherData: null
+    };
+
+    const ICONS = {
+        sunny: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>`,
+        cloudy: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="icon"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z" /></svg>`,
+        partly: `<img src="https://file.garden/Z43SqDt67TpUFO8v/weather-sun-cloudy.png" class="icon" alt="Partly">`,
+        rainy: `<img src="https://file.garden/Z43SqDt67TpUFO8v/rainy.png" class="icon" alt="Rainy">`
+    };
+
+    function init() {
+        applyTheme();
+        applyRotation();
+        updateClock();
+        setInterval(updateClock, 1000);
+        setInterval(checkAutoTheme, 60000);
+
+        document.getElementById('set-unit').value = appState.unit;
+        document.getElementById('set-theme').value = appState.theme;
+        document.getElementById('set-layout').value = appState.layout;
+        document.getElementById('set-time-format').value = appState.timeFormat;
+        document.getElementById('set-rotation').value = appState.rotation;
+
+        window.addEventListener('resize', () => {
+            if(appState.weatherData && !document.getElementById('weather-view').classList.contains('hidden')) {
+                drawGraph(appState.weatherData.hourly);
+            }
+        });
+    }
+
+    function updateClock() {
+        const now = new Date();
+        let hours = now.getHours();
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        
+        if (appState.timeFormat === '12') {
+            hours = hours % 12 || 12; 
+        } else {
+            hours = String(hours).padStart(2, '0');
+        }
+
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const year = now.getFullYear();
+
+        document.getElementById('time-display').textContent = `${hours}:${minutes}`;
+        document.getElementById('date-display').textContent = `${month}/${day}/${year}`;
+    }
+
+    function applyRotation() {
+        document.body.classList.remove('rot-90', 'rot-180', 'rot-270');
+        if (appState.rotation !== '0') {
+            document.body.classList.add(`rot-${appState.rotation}`);
+        }
+    }
+
+    function checkAutoTheme() {
+        if (appState.theme === 'auto') {
+            const hours = new Date().getHours();
+            // Hi inspect element user! If you are wondering: dark mode is between 8 PM and 6 AM
+            const isDark = hours >= 20 || hours < 6;
+            if (isDark) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        }
+    }
+
+    function applyTheme() {
+        if (appState.theme === 'dark') {
+            document.body.classList.add('dark-mode');
+        } else if (appState.theme === 'light') {
+            document.body.classList.remove('dark-mode');
+        } else {
+            checkAutoTheme();
+        }
+    }
+
+    function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
+
+    function saveAndCloseSettings() {
+        appState.unit = document.getElementById('set-unit').value;
+        appState.theme = document.getElementById('set-theme').value;
+        appState.layout = document.getElementById('set-layout').value;
+        appState.timeFormat = document.getElementById('set-time-format').value;
+        appState.rotation = document.getElementById('set-rotation').value;
+
+        localStorage.setItem('kindleUnit', appState.unit);
+        localStorage.setItem('kindleTheme', appState.theme);
+        localStorage.setItem('kindleLayout', appState.layout);
+        localStorage.setItem('kindleTimeFormat', appState.timeFormat);
+        localStorage.setItem('kindleRotation', appState.rotation);
+
+        document.body.className = '';
+        
+        document.body.classList.add(appState.layout);
+        applyTheme();
+        applyRotation();
+        updateClock();
+
+        if (appState.weatherData) renderWeather(appState.city, appState.weatherData);
+        document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function toggleMode() {
+        const clockView = document.getElementById('clock-view');
+        const weatherView = document.getElementById('weather-view');
+        const modeBtn = document.getElementById('mode-btn');
+
+        if (weatherView.classList.contains('hidden')) {
+            clockView.classList.add('hidden');
+            weatherView.classList.remove('hidden');
+            modeBtn.textContent = "Clock";
+            setTimeout(() => {
+                if (appState.city && !appState.weatherData) fetchWeather(appState.city);
+                else if (appState.weatherData) drawGraph(appState.weatherData.hourly);
+            }, 50);
+        } else {
+            weatherView.classList.add('hidden');
+            clockView.classList.remove('hidden');
+            modeBtn.textContent = "Weather";
+        }
+    }
+
+    async function fetchWeather(city) {
+        if(!city) return;
+        try {
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=en&format=json`);
+            const geoData = await geoRes.json();
+            if (!geoData.results) { alert("City not found"); return; }
+            const { latitude, longitude, name } = geoData.results[0];
+            appState.city = name;
+            localStorage.setItem('kindleCity', name);
+            document.getElementById('location-input-container').classList.add('hidden');
+            const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&hourly=temperature_2m&daily=weather_code,temperature_2m_max&timezone=auto&forecast_days=5`);
+            const data = await weatherRes.json();
+            appState.weatherData = data;
+            renderWeather(name, data);
+        } catch (e) { alert("Error"); }
+    }
+
+    function renderWeather(cityName, data) {
+        const container = document.getElementById('forecast-container');
+        container.innerHTML = '';
+        const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        data.daily.time.forEach((dateStr, index) => {
+            if(index > 4) return; 
+            const date = new Date(dateStr + 'T00:00');
+            const div = document.createElement('div');
+            div.className = 'day-card';
+            div.innerHTML = `<div class="day-name">${days[date.getDay()]}</div>${getIconByCode(data.daily.weather_code[index])}<div class="day-temp">${formatTemp(data.daily.temperature_2m_max[index])}</div>`;
+            container.appendChild(div);
+        });
+        document.getElementById('current-box').innerHTML = `${getIconByCode(data.current.weather_code)}<div class="current-city">${cityName}</div><div class="current-temp">${formatTemp(data.current.temperature_2m)}</div>`;
+        drawGraph(data.hourly);
+    }
+
+    function formatTemp(c) {
+        return appState.unit === 'F' ? Math.round((c * 9/5) + 32) + "°F" : Math.round(c) + "°C";
+    }
+
+    function getIconByCode(code) {
+        if (code === 0) return ICONS.sunny;
+        if (code >= 1 && code <= 3) return ICONS.partly;
+        if (code >= 45 && code <= 48) return ICONS.cloudy;
+        return ICONS.rainy;
+    }
+
+    function drawGraph(hourly) {
+        const svg = document.getElementById('temp-graph');
+        const wrapper = document.getElementById('graph-wrapper');
+        if (!wrapper || wrapper.clientWidth === 0 || appState.layout === 'layout-minimal') return;
+        svg.innerHTML = ''; 
+        const now = new Date();
+        const startIdx = parseInt(now.getHours());
+        const temps = []; const times = [];
+        for(let i = 0; i < 5; i++) {
+            let idx = startIdx + (i * 2);
+            if(idx < hourly.temperature_2m.length) {
+                let t = hourly.temperature_2m[idx];
+                temps.push(appState.unit === 'F' ? (t * 9/5) + 32 : t);
+                times.push(hourly.time[idx].split('T')[1].substring(0,5));
+            }
+        }
+        const width = wrapper.clientWidth; const height = wrapper.clientHeight; const padding = 30;
+        svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        const maxTemp = Math.max(...temps) + 2; const minTemp = Math.min(...temps) - 2;
+        const getX = (i) => (i / 4) * (width - 2 * padding) + padding;
+        const getY = (temp) => height - padding - ((temp - minTemp) / (maxTemp - minTemp)) * (height - 2 * padding);
+        let pathD = `M ${getX(0)} ${getY(temps[0])}`;
+        for(let i = 1; i < temps.length; i++) pathD += ` L ${getX(i)} ${getY(temps[i])}`;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", pathD); path.setAttribute("class", "graph-line"); svg.appendChild(path);
+        for(let i = 0; i < temps.length; i++) {
+            const x = getX(i); const y = getY(temps[i]);
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", x); circle.setAttribute("cy", y); circle.setAttribute("r", 4); circle.setAttribute("class", "graph-point"); svg.appendChild(circle);
+            const tText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            tText.setAttribute("x", x); tText.setAttribute("y", y - 10); tText.setAttribute("class", "graph-label"); tText.textContent = Math.round(temps[i]) + "°"; svg.appendChild(tText);
+        }
+    }
+
+    init();
+</script>
+</body>
+</html>
